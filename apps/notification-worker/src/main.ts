@@ -15,7 +15,7 @@
  * affect booking correctness (DHP is the system of record — §9.1).
  */
 
-import IORedis from 'ioredis';
+import { Redis } from 'ioredis';
 import { Worker } from 'bullmq';
 import { PrismaClient } from '@prisma/client';
 import { drainOnce } from './outbox-drain.js';
@@ -40,9 +40,9 @@ const prisma = new PrismaClient({
   log: [{ level: 'warn', emit: 'stdout' }, { level: 'error', emit: 'stdout' }],
 });
 
-// ─── Redis (BullMQ) ───────────────────────────────────────────────────────────
+// ─── Redis ────────────────────────────────────────────────────────────────────
 
-const connection = new IORedis(REDIS_URL, { maxRetriesPerRequest: null });
+const connection = new Redis(REDIS_URL, { maxRetriesPerRequest: null });
 
 // ─── BullMQ Worker — explicit push-style jobs from Core API ──────────────────
 //
@@ -76,7 +76,7 @@ const worker = new Worker(
     }
   },
   {
-    connection,
+    connection: { url: REDIS_URL },
     concurrency: parseInt(process.env['WORKER_CONCURRENCY'] ?? '5', 10),
   },
 );
