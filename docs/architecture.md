@@ -41,7 +41,7 @@ graph TB
 
 ### Web SPA (React 19 + Vite, port 5173)
 
-The browser-side single-page application. It is a pure client — it holds no business logic and enforces no security. Every state change that matters (creating a booking, updating a meeting type) is a server call. Real-time updates arrive via Server-Sent Events from the Core API; the SPA reacts by invalidating its TanStack Query cache and re-fetching rather than applying event payloads directly. This keeps client state eventually-consistent without a complex merge algorithm.
+The browser-side single-page application. It is a pure client — it holds no business logic and enforces no security. Every state change that matters (creating a patient appointment, updating an appointment type) is a server call. Real-time updates arrive via Server-Sent Events from the Core API; the SPA reacts by invalidating its TanStack Query cache and re-fetching rather than applying event payloads directly. This keeps client state eventually-consistent without a complex merge algorithm.
 
 The SPA communicates only with the Core API. It never contacts AuthPlex, the AI service, or any other backend directly. Auth tokens are kept in memory (not localStorage) so they expire naturally when the tab closes.
 
@@ -61,7 +61,7 @@ The worker is decoupled from the Core API by the transactional outbox pattern �
 
 ### AI Service (FastAPI + LangChain, port 8000)
 
-A Python microservice that wraps LLM calls. The Core API calls it when a guest submits a natural-language scheduling request (e.g., "I'd like 30 minutes sometime Thursday afternoon"). The AI service parses the intent into a structured `SchedulingIntent` object and suggests concrete time slots based on the host's availability. It also stores embedding vectors in pgvector for intent retrieval and analytics.
+A Python microservice that wraps LLM calls. The Core API calls it when a patient submits a natural-language appointment request (e.g., "I'd like 30 minutes sometime Thursday afternoon"). The AI service parses the intent into a structured `SchedulingIntent` object and suggests concrete time slots based on the healthcare provider's availability. It also stores embedding vectors in pgvector for intent retrieval and analytics.
 
 It is isolated from the browser. The Core API authenticates calls to it with a short-lived HMAC service token (`SERVICE_TOKEN_SECRET`), so the AI service rejects any request not originating from the Core API.
 
@@ -180,7 +180,7 @@ sequenceDiagram
 
 ### Step-by-step explanation
 
-**1. Guest submits booking.**
+**1. Patient submits booking.**
 The SPA posts a booking request with an `Idempotency-Key` header — a UUID the client generates and retries with on network failure. If the Core API has already processed a request with that key, it returns the original response without creating a duplicate booking.
 
 **2. Database transaction.**
@@ -297,13 +297,13 @@ erDiagram
 
 **OrgMember** (`org_members`) is the junction table between User and Organization. It was renamed from `memberships` in V3. The previous `UNIQUE(user_id)` constraint was removed to support multi-org users (for example, a doctor credentialed at multiple hospitals). It carries the `role` (ADMIN, MEMBER, or MAINTAINER) and `status` (INVITED, ACTIVE, REMOVED) lifecycle. An ADMIN can manage org settings and invite members. Soft-deletes are modeled as status transitions to REMOVED rather than physical deletion, preserving audit trails.
 
-**MeetingType** is a reusable template that defines a category of meeting an org offers: duration, buffer time before and after, minimum advance notice, maximum days in the future, daily booking cap, and conferencing type. Guests book against a meeting type — not against an arbitrary time. Each meeting type has an ordered list of Questions for the guest intake form.
+**MeetingType** is a reusable template that defines a category of appointment a clinic or hospital offers: duration, buffer time before and after, minimum advance notice, maximum days in the future, daily booking cap, and consultation type. Patients book against an appointment type — not against an arbitrary time. Each appointment type has an ordered list of Questions for the patient intake form.
 
 **MeetingTypeQuestion / MeetingTypeQuestionOption** store the intake questionnaire in normalized form. Questions can be `text`, `select`, `multiselect`, or `checkbox`. Options are stored in a child table (not JSONB) so they can be reordered and queried efficiently.
 
-**Booking** is the confirmed reservation. It references the host User, the MeetingType, and records the guest's details. The `status` field follows the lifecycle: PENDING → CONFIRMED → CANCELLED or RESCHEDULED. The `idempotency_key` unique constraint prevents duplicate bookings from network retries.
+**Booking** is the confirmed appointment reservation. It references the healthcare provider User, the MeetingType, and records the patient's details. The `status` field follows the lifecycle: PENDING → CONFIRMED → CANCELLED or RESCHEDULED. The `idempotency_key` unique constraint prevents duplicate bookings from network retries.
 
-**BookingAnswer** stores the guest's responses to MeetingTypeQuestions at booking time. Normalized into its own table so answers can be queried per question across bookings.
+**BookingAnswer** stores the patient's responses to MeetingTypeQuestions at booking time. Normalized into its own table so answers can be queried per question across bookings.
 
 **AvailabilitySchedule / AvailabilityRule** define when a host is available on a recurring weekly basis. A schedule has a timezone and a set of rules, each covering a day-of-week with a start and end time in HH:mm format. Multiple schedules per user are supported; one is marked `is_default`.
 
@@ -319,7 +319,7 @@ erDiagram
 
 **ReminderJob** schedules future reminder emails. The notification worker checks for reminder jobs whose `scheduled_for` is in the past and dispatches them.
 
-**AiEmbedding** stores pgvector embeddings of past scheduling intents. Used by the AI service to retrieve similar historical intents for few-shot prompting and analytics.
+**AiEmbedding** stores pgvector embeddings of past appointment request intents. Used by the AI service to retrieve similar historical intents for few-shot prompting and analytics.
 
 **Critical constraint** on `bookings`: `EXCLUDE USING gist (host_id WITH =, tstzrange(starts_at, ends_at, '[)') WITH &&)` — prevents any two bookings for the same host from overlapping, enforced at the database level with no possibility of race conditions at the application layer. V4 also added DB-level invariant triggers: system role protection (seeded roles and permissions cannot be deleted or mutated), `weekly_rules` validation (availability rules must form valid non-overlapping windows), and audit table immutability (`rbac_audit` and `admin_audit` rows are insert-only — UPDATE and DELETE are blocked by trigger).
 
@@ -335,7 +335,7 @@ DHP uses a three-tier role model introduced in V4. Roles and permissions are see
 |---|---|---|
 | `SUPER_ADMIN` | Platform-wide, cross-org | Recorded in `platform_admins`; bypasses RLS entirely |
 | `ORG_ADMIN` | Per-organization | Stored in `user_roles` scoped to an `organization_id` |
-| `MAINTAINER` | Per-organization | Slot owner with elevated scheduling permissions within an org |
+| `MAINTAINER` | Per-organization | Healthcare provider with elevated scheduling permissions within an org |
 
 ### Global RBAC tables (no RLS)
 

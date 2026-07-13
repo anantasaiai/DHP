@@ -33,7 +33,7 @@ Shown when a user who belongs to multiple organizations logs in. Lists all orgs 
 
 #### `MeetingTypesPage` — `features/meeting-types/MeetingTypesPage.tsx` · Route: `/meeting-types` · Protected
 
-The CRUD interface for meeting type templates. Users create, edit, and archive meeting types here. Each meeting type defines what a bookable slot looks like: its name, duration, buffer windows, conferencing provider, and the intake questions asked of guests. Data is fetched via TanStack Query hooks from `lib/api/meeting-types.ts` and mutations invalidate the relevant query keys.
+The CRUD interface for appointment type templates. Healthcare providers create, edit, and archive appointment types here. Each appointment type defines what a bookable slot looks like: its name, duration, buffer windows, consultation provider, and the intake questions asked of patients. Data is fetched via TanStack Query hooks from `lib/api/meeting-types.ts` and mutations invalidate the relevant query keys.
 
 #### `BookingPage` — `features/booking/BookingPage.tsx` · Route: `/bookings/:id` · Protected
 
@@ -41,9 +41,9 @@ Shows the detail view of a single booking: the guest's name, email, answers to i
 
 #### `PublicBookingPage` — `features/booking/PublicBookingPage.tsx` · Route: `/:orgSlug/:username/:meetingSlug` · Public
 
-The guest-facing booking flow. No login required. The URL encodes all the context needed to identify the meeting type: the organization slug, the host's username, and the meeting type slug. The page fetches the host's availability for a given date range, renders a time-slot picker, collects the guest's name, email, and answers to intake questions, and submits `POST /api/v1/bookings`.
+The patient-facing booking flow. No login required. The URL encodes all the context needed to identify the appointment type: the organization slug, the healthcare provider's username, and the appointment type slug. The page fetches the provider's availability for a given date range, renders a time-slot picker, collects the patient's name, email, and answers to intake questions, and submits `POST /api/v1/bookings`.
 
-This route is the only externally shareable URL — hosts send it to guests. It is intentionally decoupled from the authenticated dashboard so guests never need an account.
+This route is the only externally shareable URL — healthcare providers send it to patients. It is intentionally decoupled from the authenticated dashboard so patients never need an account.
 
 #### `SubscriptionExpiredPage` — `features/subscription/SubscriptionExpiredPage.tsx` · Route: `/subscription-required` · Public
 
@@ -262,7 +262,7 @@ Translates HTTP requests into use case calls and use case results into HTTP resp
 
 #### `MeetingType` — `domain/model/meeting-type.ts`
 
-The aggregate representing a bookable meeting template. Key fields: `slug` (URL-safe identifier, unique per org), `name`, `durationMinutes`, `conferencingType` (google_meet, zoom, teams, webex, custom), `bufferBeforeMinutes`, `bufferAfterMinutes` (dead time around meetings), `minNoticeMinutes` (how far in advance a guest must book), `maxDaysInFuture` (how far ahead the booking window opens), `maxPerDay` (daily cap), and `isActive`. The meeting type also owns an ordered list of intake `Questions`, each with typed `Options`.
+The aggregate representing a bookable appointment template. Key fields: `slug` (URL-safe identifier, unique per org), `name`, `durationMinutes`, `conferencingType` (google_meet, zoom, teams, webex, custom), `bufferBeforeMinutes`, `bufferAfterMinutes` (dead time around appointments), `minNoticeMinutes` (how far in advance a patient must book), `maxDaysInFuture` (how far ahead the booking window opens), `maxPerDay` (daily cap), and `isActive`. The appointment type also owns an ordered list of patient intake `Questions`, each with typed `Options`.
 
 #### `CreateMeetingTypeUseCase` — `application/create-meeting-type.use-case.ts`
 
@@ -332,7 +332,7 @@ Exposes organization management endpoints. Uses the `/me` convention (e.g., `GET
 
 A pure function (no I/O) that computes open booking windows. Given a list of `AvailabilityRule` records (recurring weekly slots), a list of `AvailabilityOverride` records (date-specific exceptions), and a list of already-booked intervals, it returns the set of free time windows for a given date range.
 
-The algorithm: for each requested date, find the applicable rules for that day-of-week, apply any override for that specific date (override wins), convert to absolute timestamps in the host's timezone, then subtract the booked intervals. The result is a list of open slots at the meeting type's configured duration.
+The algorithm: for each requested date, find the applicable rules for that day-of-week, apply any override for that specific date (override wins), convert to absolute timestamps in the healthcare provider's timezone, then subtract the booked intervals. The result is a list of open slots at the appointment type's configured duration.
 
 This is the most tested component in the codebase (`domain/model/__tests__/availability-engine.test.ts`) because it is pure logic with no external dependencies — every edge case (midnight-spanning slots, DST transitions, fully-booked days, override-closed days) is verified with fast unit tests.
 
@@ -478,7 +478,7 @@ Both endpoints delegate to application-layer use cases and return structured JSO
 
 #### `ParseIntentUseCase` — `application/parse_intent_use_case.py`
 
-Orchestrates the LLM call for intent parsing. It retrieves similar historical intents from the `AiEmbedding` store (few-shot retrieval), constructs a prompt with those examples, calls the LLM via the `LlmRunnable` port, and parses the response into a `SchedulingIntent`. Storing similar past intents in the prompt helps the model produce more accurate structured output for domain-specific scheduling language.
+Orchestrates the LLM call for intent parsing. It retrieves similar historical intents from the `AiEmbedding` store (few-shot retrieval), constructs a prompt with those examples, calls the LLM via the `LlmRunnable` port, and parses the response into a `SchedulingIntent`. Storing similar past intents in the prompt helps the model produce more accurate structured output for domain-specific appointment request language.
 
 #### `SchedulingIntent` — `domain/model/scheduling_intent.py`
 

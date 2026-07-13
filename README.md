@@ -1,6 +1,6 @@
 # DHP
 
-Enterprise scheduling and meeting-automation platform. Eliminates scheduling friction, prevents double-booking across heterogeneous calendar providers, and provisions video-conferencing links automatically.
+Multi-tenant digital healthcare platform for managing patient appointments, healthcare provider scheduling, multi-org clinic and hospital management, and real-time notifications. Prevents double-booking across providers and sends automated consultation confirmations and reminders.
 
 ---
 

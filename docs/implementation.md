@@ -6,7 +6,7 @@
 |---|---|---|
 | `auth` | `src/auth/` | JWT validation, OIDC/JWKS, user provisioning, subscription gate |
 | `booking` | `src/booking/` | Booking lifecycle (create, reschedule, cancel), real-time push |
-| `meeting-types` | `src/meeting-types/` | Meeting template CRUD (duration, questions, conferencing) |
+| `meeting-types` | `src/meeting-types/` | Appointment type template CRUD (duration, questions, consultation type) |
 | `organization` | `src/organization/` | Org management, membership, invites |
 | `availability` | `src/availability/` | Weekly schedules, per-day overrides, slot querying |
 | `shared-kernel` | `src/shared-kernel/` | Result type, Clock port, IdGenerator port |
@@ -207,7 +207,7 @@ npx @openapitools/openapi-generator-cli generate \
 ### Tenant Isolation
 Every repository query includes `where: { organizationId: principal.organizationId }`. PostgreSQL RLS policies are the backstop — a leaked query would still hit RLS and return empty rather than cross-tenant data.
 
-Multi-org users (e.g. doctors at multiple hospitals) have multiple `org_members` rows. The session carries a single `organizationId` chosen at login. All queries use that session-scoped org ID.
+Multi-org users (e.g. healthcare providers credentialed at multiple hospitals or clinics) have multiple `org_members` rows. The session carries a single `organizationId` chosen at login. All queries use that session-scoped org ID.
 
 ### Enums
 All Prisma enums must carry `@@map("snake_case_pg_type")` to match the Flyway-created PostgreSQL types. Adding an enum without `@@map` will break `prisma generate` against the live schema.
