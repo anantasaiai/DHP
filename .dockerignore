@@ -1,0 +1,17 @@
+node_modules
+**/node_modules
+.git
+.env*
+**/.env*
+**/dist
+**/__pycache__
+**/*.pyc
+**/*.pyo
+**/*.test.ts
+**/*.spec.ts
+**/test
+**/tests
+**/*.test.tsx
+**/*.spec.tsx
+.turbo
+coverage

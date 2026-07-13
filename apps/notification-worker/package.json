@@ -1,0 +1,29 @@
+{
+  "name": "@dhp/notification-worker",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Node.js BullMQ consumer — drains the transactional outbox (§9.1) and dispatches notifications. Separately deployable from core.",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx watch src/main.ts",
+    "start": "node dist/main.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test:unit": "vitest run --config vitest.unit.config.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.22.0",
+    "@dhp/types": "workspace:*",
+    "bullmq": "^5.13.0",
+    "ioredis": "^5.4.0",
+    "pino": "^9.5.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "pino-pretty": "^13.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}

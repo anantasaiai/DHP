@@ -1,0 +1,112 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: dhp_dev
+      POSTGRES_USER: dhp
+      POSTGRES_PASSWORD: dhp_dev_password
+    ports:
+      - '5433:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U dhp -d dhp_dev']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # §5.1 — Flyway runs migrations before any application version serves traffic.
+  flyway:
+    image: flyway/flyway:10-alpine
+    command: >
+      -url=jdbc:postgresql://postgres:5432/dhp_dev
+      -user=dhp
+      -password=dhp_dev_password
+      -locations=filesystem:/flyway/sql
+      -baselineOnMigrate=true
+      -baselineVersion=1
+      migrate
+    volumes:
+      - ./migrations:/flyway/sql
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: on-failure
+
+  authplex:
+    build:
+      context: /Users/sai/Documents/authplex
+    ports: ['8080:8080']
+    environment:
+      AUTHPLEX_ENV: development
+      AUTHPLEX_ISSUER: http://localhost:8080
+      AUTHPLEX_ADMIN_API_KEY: local-admin-key
+      AUTHPLEX_CORS_ORIGINS: '*'
+      AUTHPLEX_DEFAULT_TENANT_ID: 4aa2670c-2a50-5851-a4e4-f4931e6f49e5
+      AUTHPLEX_DATABASE_DSN: postgres://dhp:dhp_dev_password@postgres:5432/dhp_dev?sslmode=disable&search_path=authplex
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'wget', '--no-verbose', '--tries=1', '--spider', 'http://localhost:8080/health']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes --requirepass dhp_redis_password
+    ports:
+      - '6380:6379'
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', '-a', 'dhp_redis_password', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  core-api:
+    build:
+      context: .
+      dockerfile: apps/core-api/Dockerfile
+      target: runtime
+    environment:
+      DATABASE_URL: postgresql://dhp:dhp_dev_password@postgres:5432/dhp_dev
+      REDIS_URL: redis://:dhp_redis_password@redis:6379
+      NODE_ENV: production
+      OIDC_ISSUER: ${OIDC_ISSUER:-http://host.docker.internal:8080}
+      OIDC_AUDIENCE: ${OIDC_AUDIENCE:-dhp-api}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-dhp-web}
+      OIDC_JWKS_URI: ${OIDC_JWKS_URI:-http://host.docker.internal:8080/.well-known/jwks.json}
+    ports:
+      - '3000:3000'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      flyway:
+        condition: service_completed_successfully
+
+  ai-service:
+    build:
+      context: .
+      dockerfile: apps/ai-service/Dockerfile
+      target: runtime
+    environment:
+      DATABASE_URL: postgresql://dhp:dhp_dev_password@postgres:5432/dhp_dev
+      CORE_API_URL: http://core-api:3000
+      PYTHONPATH: /app
+    ports:
+      - '8000:8000'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      flyway:
+        condition: service_completed_successfully
+
+volumes:
+  postgres_data:
+  redis_data:
